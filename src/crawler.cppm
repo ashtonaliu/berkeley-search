@@ -7,11 +7,13 @@ module;
 
 export module berkeley_search.crawler;
 
+export import berkeley_search.document;
+
 export class Crawler {
 public:
     explicit Crawler(const std::string& startUrl);
 
-    void crawl(std::size_t maxPages);
+    std::vector<Document> crawl(std::size_t maxPages);
 
 private:
     std::string startUrl;

@@ -10,11 +10,15 @@ module;
 
 module berkeley_search.crawler;
 
+import berkeley_search.html_text_extractor;
+
 Crawler::Crawler(const std::string& startUrl)
     : startUrl(startUrl) {}
 
-void Crawler::crawl(std::size_t maxPages) {
+std::vector<Document> Crawler::crawl(std::size_t maxPages) {
     std::queue<std::string> urls;
+    std::vector<Document> documents;
+    const HtmlTextExtractor textExtractor;
 
     // Put starting URL in queue.
     urls.push(startUrl);
@@ -37,6 +41,13 @@ void Crawler::crawl(std::size_t maxPages) {
 
         // This page has now actually been crawled.
         visited.insert(url);
+
+        documents.push_back(Document{
+            documents.size(),
+            url,
+            "",
+            textExtractor.extract(html)
+        });
 
         std::vector<std::string> links = extractLinks(html);
 
@@ -73,6 +84,8 @@ void Crawler::crawl(std::size_t maxPages) {
         << "Pages visited: "
         << visited.size()
         << '\n';
+
+    return documents;
 }
 
 std::size_t Crawler::writeCallback(

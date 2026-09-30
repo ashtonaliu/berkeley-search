@@ -279,10 +279,11 @@ add_custom_command(
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${MODULE_DIRECTORY}"
     COMMAND "${CMAKE_CXX_COMPILER}"
         ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/crawler.cppm"
         --precompile
         -o "${CRAWLER_PCM}"
-    DEPENDS src/crawler.cppm
+    DEPENDS src/crawler.cppm "${DOCUMENT_PCM}"
     VERBATIM
 )
 
@@ -291,10 +292,11 @@ add_custom_command(
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
     COMMAND "${CMAKE_CXX_COMPILER}"
         ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         "${CRAWLER_PCM}"
         -c
         -o "${CRAWLER_INTERFACE_OBJECT}"
-    DEPENDS "${CRAWLER_PCM}"
+    DEPENDS "${CRAWLER_PCM}" "${DOCUMENT_PCM}"
     VERBATIM
 )
 
@@ -304,10 +306,16 @@ add_custom_command(
     COMMAND "${CMAKE_CXX_COMPILER}"
         ${COMMON_COMPILE_FLAGS}
         "-I${CURL_INCLUDE_DIRECTORY}"
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        "-fmodule-file=berkeley_search.html_text_extractor=${HTML_TEXT_EXTRACTOR_PCM}"
         "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/src/crawler.cpp"
         -o "${CRAWLER_IMPLEMENTATION_OBJECT}"
-    DEPENDS src/crawler.cpp "${CRAWLER_PCM}"
+    DEPENDS
+        src/crawler.cpp
+        "${CRAWLER_PCM}"
+        "${DOCUMENT_PCM}"
+        "${HTML_TEXT_EXTRACTOR_PCM}"
     VERBATIM
 )
 
@@ -317,10 +325,11 @@ add_custom_command(
     COMMAND "${CMAKE_CXX_COMPILER}"
         ${COMMON_COMPILE_FLAGS}
         "-I${CURL_INCLUDE_DIRECTORY}"
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
         -o "${MAIN_OBJECT}"
-    DEPENDS src/main.cpp "${CRAWLER_PCM}"
+    DEPENDS src/main.cpp "${CRAWLER_PCM}" "${DOCUMENT_PCM}"
     VERBATIM
 )
 
@@ -329,12 +338,18 @@ add_custom_command(
     COMMAND "${CMAKE_CXX_COMPILER}"
         "${CRAWLER_INTERFACE_OBJECT}"
         "${CRAWLER_IMPLEMENTATION_OBJECT}"
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${MAIN_OBJECT}"
         "${CURL_LIBRARY}"
         -o "${SEARCH_EXECUTABLE}"
     DEPENDS
         "${CRAWLER_INTERFACE_OBJECT}"
         "${CRAWLER_IMPLEMENTATION_OBJECT}"
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${MAIN_OBJECT}"
     VERBATIM
 )
@@ -342,3 +357,54 @@ add_custom_command(
 add_custom_target(search-app ALL
     DEPENDS "${SEARCH_EXECUTABLE}"
 )
+
+set(CRAWLER_TEST_OBJECT
+    "${OBJECT_DIRECTORY}/crawler-test.o"
+)
+set(CRAWLER_TEST_EXECUTABLE
+    "${CMAKE_CURRENT_BINARY_DIR}/crawler-test"
+)
+
+add_custom_command(
+    OUTPUT "${CRAWLER_TEST_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-I${CURL_INCLUDE_DIRECTORY}"
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/crawler_test.cpp"
+        -o "${CRAWLER_TEST_OBJECT}"
+    DEPENDS
+        tests/crawler_test.cpp
+        "${CRAWLER_PCM}"
+        "${DOCUMENT_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${CRAWLER_TEST_EXECUTABLE}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        "${CRAWLER_INTERFACE_OBJECT}"
+        "${CRAWLER_IMPLEMENTATION_OBJECT}"
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${CRAWLER_TEST_OBJECT}"
+        "${CURL_LIBRARY}"
+        -o "${CRAWLER_TEST_EXECUTABLE}"
+    DEPENDS
+        "${CRAWLER_INTERFACE_OBJECT}"
+        "${CRAWLER_IMPLEMENTATION_OBJECT}"
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${CRAWLER_TEST_OBJECT}"
+    VERBATIM
+)
+
+add_custom_target(crawler-tests ALL
+    DEPENDS "${CRAWLER_TEST_EXECUTABLE}"
+)
+
+add_test(NAME crawler COMMAND "${CRAWLER_TEST_EXECUTABLE}")
