@@ -45,7 +45,7 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
         documents.push_back(Document{
             documents.size(),
             url,
-            "",
+            textExtractor.extractTitle(html),
             textExtractor.extract(html)
         });
 

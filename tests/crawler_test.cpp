@@ -46,7 +46,7 @@ int main() {
         documents.size() == 1 &&
         documents[0].id == 0 &&
         documents[0].url == pageUrl &&
-        documents[0].title.empty() &&
+        documents[0].title == "Test page" &&
         documents[0].text ==
             "Test page Operating Systems Learn about processes.";
 

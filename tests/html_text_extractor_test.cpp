@@ -23,6 +23,24 @@ bool expectText(
     return false;
 }
 
+bool expectTitle(
+    const HtmlTextExtractor& extractor,
+    const std::string& html,
+    const std::string& expected
+) {
+    const std::string actual = extractor.extractTitle(html);
+
+    if (actual == expected) {
+        return true;
+    }
+
+    std::cerr
+        << "Title extraction failed.\n"
+        << "Expected: " << expected << '\n'
+        << "Actual:   " << actual << '\n';
+    return false;
+}
+
 } // namespace
 
 int main() {
@@ -66,6 +84,28 @@ int main() {
         "<STYLE>body { display: none; }</STYLE><p>Visible</p>",
         "Visible"
     );
+    passed &= expectTitle(
+        extractor,
+        "<html><head><title>Berkeley EECS</title></head></html>",
+        "Berkeley EECS"
+    );
+    passed &= expectTitle(
+        extractor,
+        "<TITLE data-page=\"course\">  CS 162\nOperating Systems  </TITLE>",
+        "CS 162 Operating Systems"
+    );
+    passed &= expectTitle(
+        extractor,
+        "<!-- <title>Wrong</title> --><title>Correct</title>",
+        "Correct"
+    );
+    passed &= expectTitle(
+        extractor,
+        "<script>const example = '<title>Wrong</title>';</script>"
+        "<title>Correct</title>",
+        "Correct"
+    );
+    passed &= expectTitle(extractor, "<html><body>No title</body></html>", "");
 
     if (!passed) {
         return 1;

@@ -209,3 +209,78 @@ std::string HtmlTextExtractor::extract(const std::string& html) const {
 
     return text;
 }
+
+std::string HtmlTextExtractor::extractTitle(
+    const std::string& html
+) const {
+    std::size_t index = 0;
+
+    while (index < html.size()) {
+        const std::size_t tagStart = html.find('<', index);
+
+        if (tagStart == std::string::npos) {
+            return "";
+        }
+
+        if (html.compare(tagStart, 4, "<!--") == 0) {
+            const std::size_t commentEnd = html.find("-->", tagStart + 4);
+
+            if (commentEnd == std::string::npos) {
+                return "";
+            }
+
+            index = commentEnd + 3;
+            continue;
+        }
+
+        const std::size_t tagEnd = findTagEnd(html, tagStart);
+
+        if (tagEnd == std::string::npos) {
+            return "";
+        }
+
+        const Tag tag = parseTag(html, tagStart, tagEnd);
+
+        if (
+            !tag.isClosing &&
+            (tag.name == "script" || tag.name == "style")
+        ) {
+            const std::size_t closingTag =
+                findClosingTag(html, tagEnd + 1, tag.name);
+
+            if (closingTag == std::string::npos) {
+                return "";
+            }
+
+            const std::size_t closingTagEnd =
+                findTagEnd(html, closingTag);
+
+            if (closingTagEnd == std::string::npos) {
+                return "";
+            }
+
+            index = closingTagEnd + 1;
+            continue;
+        }
+
+        if (!tag.isClosing && tag.name == "title") {
+            const std::size_t closingTag =
+                findClosingTag(html, tagEnd + 1, tag.name);
+
+            if (closingTag == std::string::npos) {
+                return "";
+            }
+
+            return extract(
+                html.substr(
+                    tagEnd + 1,
+                    closingTag - (tagEnd + 1)
+                )
+            );
+        }
+
+        index = tagEnd + 1;
+    }
+
+    return "";
+}
