@@ -61,6 +61,4 @@ private:
         const std::string& html
     );
 
-    std::string normalizeUrl(const std::string& link);
-    bool shouldVisit(const std::string& url);
 };

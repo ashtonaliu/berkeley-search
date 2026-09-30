@@ -16,6 +16,7 @@ module berkeley_search.crawler;
 
 import berkeley_search.html_text_extractor;
 import berkeley_search.robots_policy;
+import berkeley_search.url_normalizer;
 
 namespace {
 
@@ -55,47 +56,6 @@ bool isRobotsContentType(const char* contentType) {
     return normalizedContentType(contentType).find("text/plain") == 0;
 }
 
-std::string originFromUrl(const std::string& url) {
-    const std::size_t schemeEnd = url.find("://");
-
-    if (schemeEnd == std::string::npos) {
-        return "";
-    }
-
-    const std::size_t authorityEnd =
-        url.find_first_of("/?#", schemeEnd + 3);
-
-    if (authorityEnd == std::string::npos) {
-        return url;
-    }
-
-    return url.substr(0, authorityEnd);
-}
-
-std::string pathFromUrl(const std::string& url) {
-    const std::size_t schemeEnd = url.find("://");
-
-    if (schemeEnd == std::string::npos) {
-        return "/";
-    }
-
-    const std::size_t pathStart =
-        url.find_first_of("/?#", schemeEnd + 3);
-
-    if (pathStart == std::string::npos || url[pathStart] == '#') {
-        return "/";
-    }
-
-    const std::size_t fragment = url.find('#', pathStart);
-    std::string path = url.substr(pathStart, fragment - pathStart);
-
-    if (!path.empty() && path.front() == '?') {
-        path.insert(path.begin(), '/');
-    }
-
-    return path.empty() ? "/" : path;
-}
-
 } // namespace
 
 Crawler::Crawler(
@@ -108,12 +68,13 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
     std::queue<std::string> urls;
     std::vector<Document> documents;
     const HtmlTextExtractor textExtractor;
+    const UrlNormalizer urlNormalizer(startUrl);
     RobotsPolicy robotsPolicy;
     bool hasMadeHttpRequest = false;
 
     if (isHttpUrl(startUrl)) {
         const std::string robotsUrl =
-            originFromUrl(startUrl) + "/robots.txt";
+            urlNormalizer.origin() + "/robots.txt";
 
         std::cout << "Checking robots policy: " << robotsUrl << '\n';
 
@@ -152,17 +113,22 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
     }
 
     // Put starting URL in queue.
-    urls.push(startUrl);
+    const std::string normalizedStart =
+        urlNormalizer.resolve(startUrl, startUrl);
+    const std::string crawlStart =
+        normalizedStart.empty() ? startUrl : normalizedStart;
+
+    urls.push(crawlStart);
 
     // Mark it as discovered immediately.
-    discovered.insert(startUrl);
+    discovered.insert(crawlStart);
 
     while (!urls.empty() && visited.size() < maxPages) {
         std::string url = urls.front();
         urls.pop();
 
         if (isHttpUrl(url)) {
-            if (!robotsPolicy.allows(pathFromUrl(url))) {
+            if (!robotsPolicy.allows(urlNormalizer.path(url))) {
                 std::cout << "Blocked by robots.txt: " << url << '\n';
                 continue;
             }
@@ -217,19 +183,20 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
         std::vector<std::string> links = extractLinks(html);
 
         for (const std::string& link : links) {
-            std::string normalized = normalizeUrl(link);
+            const std::string normalized =
+                urlNormalizer.resolve(url, link);
 
             if (normalized.empty()) {
                 continue;
             }
 
-            if (!shouldVisit(normalized)) {
+            if (!urlNormalizer.isAllowedOrigin(normalized)) {
                 continue;
             }
 
             if (
                 isHttpUrl(normalized) &&
-                !robotsPolicy.allows(pathFromUrl(normalized))
+                !robotsPolicy.allows(urlNormalizer.path(normalized))
             ) {
                 continue;
             }
@@ -373,43 +340,4 @@ std::vector<std::string> Crawler::extractLinks(
     }
 
     return links;
-}
-
-std::string Crawler::normalizeUrl(const std::string& link) {
-    if (link.empty()) {
-        return "";
-    }
-
-    // Already absolute.
-    if (
-        link.find("https://") == 0 ||
-        link.find("http://") == 0
-    ) {
-        return link;
-    }
-
-    // Root-relative URL.
-    if (link[0] == '/') {
-        return "https://eecs.berkeley.edu" + link;
-    }
-
-    return "";
-}
-
-bool Crawler::shouldVisit(const std::string& url) {
-    if (url.empty()) {
-        return false;
-    }
-
-    // Only crawl EECS Berkeley.
-    if (url.find("https://eecs.berkeley.edu/") != 0) {
-        return false;
-    }
-
-    // Ignore URL fragments.
-    if (url.find('#') != std::string::npos) {
-        return false;
-    }
-
-    return true;
 }

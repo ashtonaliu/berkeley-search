@@ -21,6 +21,12 @@ request timeouts, follows at most five redirects, rejects unsuccessful HTTP
 status codes, and indexes only HTML or XHTML responses. These defaults can be
 changed through `CrawlerOptions`.
 
+Links are resolved against the page where they were found, so root-relative,
+path-relative, parent-relative, and query-relative references can all enter the
+crawl queue. URL fragments are removed to avoid crawling the same document
+more than once, default ports are normalized, and links outside the starting
+origin are rejected.
+
 Before downloading pages, the crawler fetches `/robots.txt` for the starting
 origin and applies the rules for `BerkeleySearchLearningBot`. It supports
 case-insensitive user-agent selection, combined matching groups, `Allow`,

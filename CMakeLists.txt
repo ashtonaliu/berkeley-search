@@ -210,6 +210,100 @@ add_test(
     COMMAND "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
 )
 
+set(URL_NORMALIZER_PCM
+    "${MODULE_DIRECTORY}/berkeley_search.url_normalizer.pcm"
+)
+set(URL_NORMALIZER_INTERFACE_OBJECT
+    "${OBJECT_DIRECTORY}/url-normalizer-interface.o"
+)
+set(URL_NORMALIZER_IMPLEMENTATION_OBJECT
+    "${OBJECT_DIRECTORY}/url-normalizer.o"
+)
+set(URL_NORMALIZER_TEST_OBJECT
+    "${OBJECT_DIRECTORY}/url-normalizer-test.o"
+)
+set(URL_NORMALIZER_TEST_EXECUTABLE
+    "${CMAKE_CURRENT_BINARY_DIR}/url-normalizer-test"
+)
+
+add_custom_command(
+    OUTPUT "${URL_NORMALIZER_PCM}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MODULE_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/url_normalizer.cppm"
+        --precompile
+        -o "${URL_NORMALIZER_PCM}"
+    DEPENDS src/url_normalizer.cppm
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${URL_NORMALIZER_INTERFACE_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${URL_NORMALIZER_PCM}"
+        -c
+        -o "${URL_NORMALIZER_INTERFACE_OBJECT}"
+    DEPENDS "${URL_NORMALIZER_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-I${CURL_INCLUDE_DIRECTORY}"
+        "-fmodule-file=berkeley_search.url_normalizer=${URL_NORMALIZER_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/src/url_normalizer.cpp"
+        -o "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
+    DEPENDS src/url_normalizer.cpp "${URL_NORMALIZER_PCM}"
+    VERBATIM
+)
+
+add_custom_target(url-normalizer-module
+    DEPENDS
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
+)
+
+add_custom_command(
+    OUTPUT "${URL_NORMALIZER_TEST_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-I${CURL_INCLUDE_DIRECTORY}"
+        "-fmodule-file=berkeley_search.url_normalizer=${URL_NORMALIZER_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/url_normalizer_test.cpp"
+        -o "${URL_NORMALIZER_TEST_OBJECT}"
+    DEPENDS tests/url_normalizer_test.cpp
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${URL_NORMALIZER_TEST_EXECUTABLE}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
+        "${URL_NORMALIZER_TEST_OBJECT}"
+        "${CURL_LIBRARY}"
+        -o "${URL_NORMALIZER_TEST_EXECUTABLE}"
+    DEPENDS "${URL_NORMALIZER_TEST_OBJECT}"
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
+    VERBATIM
+)
+
+add_custom_target(url-normalizer-tests ALL
+    DEPENDS "${URL_NORMALIZER_TEST_EXECUTABLE}"
+)
+
+add_dependencies(url-normalizer-tests url-normalizer-module)
+
+add_test(NAME url-normalizer COMMAND "${URL_NORMALIZER_TEST_EXECUTABLE}")
+
 set(ROBOTS_POLICY_PCM
     "${MODULE_DIRECTORY}/berkeley_search.robots_policy.pcm"
 )
@@ -630,12 +724,14 @@ add_custom_command(
         "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         "-fmodule-file=berkeley_search.html_text_extractor=${HTML_TEXT_EXTRACTOR_PCM}"
         "-fmodule-file=berkeley_search.robots_policy=${ROBOTS_POLICY_PCM}"
+        "-fmodule-file=berkeley_search.url_normalizer=${URL_NORMALIZER_PCM}"
         "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/src/crawler.cpp"
         -o "${CRAWLER_IMPLEMENTATION_OBJECT}"
     DEPENDS
         src/crawler.cpp
         "${CRAWLER_PCM}"
+        "${URL_NORMALIZER_PCM}"
     VERBATIM
 )
 
@@ -650,6 +746,7 @@ add_dependencies(
     document-module
     html-text-extractor-module
     robots-policy-module
+    url-normalizer-module
 )
 
 add_custom_command(
@@ -678,6 +775,8 @@ add_custom_command(
         "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${ROBOTS_POLICY_INTERFACE_OBJECT}"
         "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
         "${SEARCH_INDEX_INTERFACE_OBJECT}"
         "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
         "${SEARCH_ENGINE_INTERFACE_OBJECT}"
@@ -689,6 +788,10 @@ add_custom_command(
         -o "${SEARCH_EXECUTABLE}"
     DEPENDS
         "${MAIN_OBJECT}"
+        "${CRAWLER_INTERFACE_OBJECT}"
+        "${CRAWLER_IMPLEMENTATION_OBJECT}"
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
     VERBATIM
 )
 
@@ -734,11 +837,17 @@ add_custom_command(
         "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${ROBOTS_POLICY_INTERFACE_OBJECT}"
         "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
         "${CRAWLER_TEST_OBJECT}"
         "${CURL_LIBRARY}"
         -o "${CRAWLER_TEST_EXECUTABLE}"
     DEPENDS
         "${CRAWLER_TEST_OBJECT}"
+        "${CRAWLER_INTERFACE_OBJECT}"
+        "${CRAWLER_IMPLEMENTATION_OBJECT}"
+        "${URL_NORMALIZER_INTERFACE_OBJECT}"
+        "${URL_NORMALIZER_IMPLEMENTATION_OBJECT}"
     VERBATIM
 )
 
