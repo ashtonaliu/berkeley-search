@@ -282,6 +282,109 @@ add_dependencies(document-tests document-module)
 
 add_test(NAME document COMMAND "${DOCUMENT_TEST_EXECUTABLE}")
 
+set(SEARCH_INDEX_PCM
+    "${MODULE_DIRECTORY}/berkeley_search.search_index.pcm"
+)
+set(SEARCH_INDEX_INTERFACE_OBJECT
+    "${OBJECT_DIRECTORY}/search-index-interface.o"
+)
+set(SEARCH_INDEX_IMPLEMENTATION_OBJECT
+    "${OBJECT_DIRECTORY}/search-index.o"
+)
+set(SEARCH_INDEX_TEST_OBJECT
+    "${OBJECT_DIRECTORY}/search-index-test.o"
+)
+set(SEARCH_INDEX_TEST_EXECUTABLE
+    "${CMAKE_CURRENT_BINARY_DIR}/search-index-test"
+)
+
+add_custom_command(
+    OUTPUT "${SEARCH_INDEX_PCM}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MODULE_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/search_index.cppm"
+        --precompile
+        -o "${SEARCH_INDEX_PCM}"
+    DEPENDS src/search_index.cppm
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${SEARCH_INDEX_INTERFACE_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        "${SEARCH_INDEX_PCM}"
+        -c
+        -o "${SEARCH_INDEX_INTERFACE_OBJECT}"
+    DEPENDS "${SEARCH_INDEX_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        "-fmodule-file=berkeley_search.tokenizer=${TOKENIZER_PCM}"
+        "-fmodule-file=berkeley_search.search_index=${SEARCH_INDEX_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/src/search_index.cpp"
+        -o "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
+    DEPENDS src/search_index.cpp "${SEARCH_INDEX_PCM}"
+    VERBATIM
+)
+
+add_custom_target(search-index-module
+    DEPENDS
+        "${SEARCH_INDEX_INTERFACE_OBJECT}"
+        "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
+)
+
+add_dependencies(
+    search-index-module
+    document-module
+    tokenizer-module
+)
+
+add_custom_command(
+    OUTPUT "${SEARCH_INDEX_TEST_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        "-fmodule-file=berkeley_search.search_index=${SEARCH_INDEX_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/search_index_test.cpp"
+        -o "${SEARCH_INDEX_TEST_OBJECT}"
+    DEPENDS tests/search_index_test.cpp
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${SEARCH_INDEX_TEST_EXECUTABLE}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        "${SEARCH_INDEX_INTERFACE_OBJECT}"
+        "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${TOKENIZER_INTERFACE_OBJECT}"
+        "${TOKENIZER_IMPLEMENTATION_OBJECT}"
+        "${SEARCH_INDEX_TEST_OBJECT}"
+        -o "${SEARCH_INDEX_TEST_EXECUTABLE}"
+    DEPENDS "${SEARCH_INDEX_TEST_OBJECT}"
+    VERBATIM
+)
+
+add_custom_target(search-index-tests ALL
+    DEPENDS "${SEARCH_INDEX_TEST_EXECUTABLE}"
+)
+
+add_dependencies(search-index-tests search-index-module)
+
+add_test(NAME search-index COMMAND "${SEARCH_INDEX_TEST_EXECUTABLE}")
+
 set(CRAWLER_PCM
     "${MODULE_DIRECTORY}/berkeley_search.crawler.pcm"
 )
@@ -357,6 +460,7 @@ add_custom_command(
         "-I${CURL_INCLUDE_DIRECTORY}"
         "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
+        "-fmodule-file=berkeley_search.search_index=${SEARCH_INDEX_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
         -o "${MAIN_OBJECT}"
     DEPENDS src/main.cpp
@@ -371,6 +475,10 @@ add_custom_command(
         "${DOCUMENT_INTERFACE_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${SEARCH_INDEX_INTERFACE_OBJECT}"
+        "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
+        "${TOKENIZER_INTERFACE_OBJECT}"
+        "${TOKENIZER_IMPLEMENTATION_OBJECT}"
         "${MAIN_OBJECT}"
         "${CURL_LIBRARY}"
         -o "${SEARCH_EXECUTABLE}"
@@ -383,7 +491,11 @@ add_custom_target(search-app ALL
     DEPENDS "${SEARCH_EXECUTABLE}"
 )
 
-add_dependencies(search-app crawler-module)
+add_dependencies(
+    search-app
+    crawler-module
+    search-index-module
+)
 
 set(CRAWLER_TEST_OBJECT
     "${OBJECT_DIRECTORY}/crawler-test.o"
