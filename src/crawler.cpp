@@ -1,9 +1,14 @@
-#include "crawler.h"
+module;
 
 #include <iostream>
 #include <queue>
+#include <string>
+#include <unordered_set>
+#include <vector>
 
 #include <curl/curl.h>
+
+module berkeley_search.crawler;
 
 Crawler::Crawler(const std::string& startUrl)
     : startUrl(startUrl) {}

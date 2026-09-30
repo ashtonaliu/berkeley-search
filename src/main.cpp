@@ -1,6 +1,6 @@
-#include "crawler.h"
-
 #include <curl/curl.h>
+
+import berkeley_search.crawler;
 
 int main() {
     curl_global_init(CURL_GLOBAL_DEFAULT);

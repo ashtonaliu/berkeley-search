@@ -1,11 +1,13 @@
-#pragma once
+module;
 
 #include <cstddef>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
-class Crawler {
+export module berkeley_search.crawler;
+
+export class Crawler {
 public:
     explicit Crawler(const std::string& startUrl);
 
