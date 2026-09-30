@@ -108,6 +108,93 @@ add_custom_target(tokenizer-tests ALL
 
 add_test(NAME tokenizer COMMAND "${TOKENIZER_TEST_EXECUTABLE}")
 
+set(HTML_TEXT_EXTRACTOR_PCM
+    "${MODULE_DIRECTORY}/berkeley_search.html_text_extractor.pcm"
+)
+set(HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT
+    "${OBJECT_DIRECTORY}/html-text-extractor-interface.o"
+)
+set(HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT
+    "${OBJECT_DIRECTORY}/html-text-extractor.o"
+)
+set(HTML_TEXT_EXTRACTOR_TEST_OBJECT
+    "${OBJECT_DIRECTORY}/html-text-extractor-test.o"
+)
+set(HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE
+    "${CMAKE_CURRENT_BINARY_DIR}/html-text-extractor-test"
+)
+
+add_custom_command(
+    OUTPUT "${HTML_TEXT_EXTRACTOR_PCM}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MODULE_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/html_text_extractor.cppm"
+        --precompile
+        -o "${HTML_TEXT_EXTRACTOR_PCM}"
+    DEPENDS src/html_text_extractor.cppm
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${HTML_TEXT_EXTRACTOR_PCM}"
+        -c
+        -o "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+    DEPENDS "${HTML_TEXT_EXTRACTOR_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.html_text_extractor=${HTML_TEXT_EXTRACTOR_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/src/html_text_extractor.cpp"
+        -o "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+    DEPENDS src/html_text_extractor.cpp "${HTML_TEXT_EXTRACTOR_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.html_text_extractor=${HTML_TEXT_EXTRACTOR_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/html_text_extractor_test.cpp"
+        -o "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
+    DEPENDS tests/html_text_extractor_test.cpp "${HTML_TEXT_EXTRACTOR_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
+        -o "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
+    DEPENDS
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
+    VERBATIM
+)
+
+add_custom_target(html-text-extractor-tests ALL
+    DEPENDS "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
+)
+
+add_test(
+    NAME html-text-extractor
+    COMMAND "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
+)
+
 set(CRAWLER_PCM
     "${MODULE_DIRECTORY}/berkeley_search.crawler.pcm"
 )
