@@ -195,6 +195,73 @@ add_test(
     COMMAND "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
 )
 
+set(DOCUMENT_PCM
+    "${MODULE_DIRECTORY}/berkeley_search.document.pcm"
+)
+set(DOCUMENT_INTERFACE_OBJECT
+    "${OBJECT_DIRECTORY}/document-interface.o"
+)
+set(DOCUMENT_TEST_OBJECT
+    "${OBJECT_DIRECTORY}/document-test.o"
+)
+set(DOCUMENT_TEST_EXECUTABLE
+    "${CMAKE_CURRENT_BINARY_DIR}/document-test"
+)
+
+add_custom_command(
+    OUTPUT "${DOCUMENT_PCM}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MODULE_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/document.cppm"
+        --precompile
+        -o "${DOCUMENT_PCM}"
+    DEPENDS src/document.cppm
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${DOCUMENT_INTERFACE_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${DOCUMENT_PCM}"
+        -c
+        -o "${DOCUMENT_INTERFACE_OBJECT}"
+    DEPENDS "${DOCUMENT_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${DOCUMENT_TEST_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/document_test.cpp"
+        -o "${DOCUMENT_TEST_OBJECT}"
+    DEPENDS tests/document_test.cpp "${DOCUMENT_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${DOCUMENT_TEST_EXECUTABLE}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${DOCUMENT_TEST_OBJECT}"
+        -o "${DOCUMENT_TEST_EXECUTABLE}"
+    DEPENDS
+        "${DOCUMENT_INTERFACE_OBJECT}"
+        "${DOCUMENT_TEST_OBJECT}"
+    VERBATIM
+)
+
+add_custom_target(document-tests ALL
+    DEPENDS "${DOCUMENT_TEST_EXECUTABLE}"
+)
+
+add_test(NAME document COMMAND "${DOCUMENT_TEST_EXECUTABLE}")
+
 set(CRAWLER_PCM
     "${MODULE_DIRECTORY}/berkeley_search.crawler.pcm"
 )
