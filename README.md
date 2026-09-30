@@ -6,7 +6,7 @@ fundamentals by crawling a small set of UC Berkeley EECS pages.
 ## Build and test
 
 This project currently uses C++20 named modules with Apple Clang. Configure,
-build, and run the tokenizer tests with:
+build, and run the tests with:
 
 ```sh
 cmake -S . -B build
@@ -16,6 +16,19 @@ ctest --test-dir build --output-on-failure
 
 The crawler executable is written to `build/berkeley-search`. Running it makes
 live HTTP requests, so keep the configured page limit small during development.
+
+## Search from the terminal
+
+Run the crawler and interactive search prompt with:
+
+```sh
+./build/berkeley-search
+```
+
+After crawling and indexing finish, enter queries such as `operating systems`.
+An empty query exits. The first ranking method is intentionally simple: for
+each distinct normalized query term, it adds that term's frequency in each
+matching document. Results with equal scores are ordered by document ID.
 
 ## Headers compared with modules
 
