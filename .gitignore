@@ -1,0 +1,4 @@
+# Local build outputs
+/src/main
+/src/crawler
+/build/
