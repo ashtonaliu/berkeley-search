@@ -1,8 +1,12 @@
 module;
 
+#include <algorithm>
+#include <chrono>
+#include <cctype>
 #include <iostream>
 #include <queue>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -12,13 +16,47 @@ module berkeley_search.crawler;
 
 import berkeley_search.html_text_extractor;
 
-Crawler::Crawler(const std::string& startUrl)
-    : startUrl(startUrl) {}
+namespace {
+
+bool isHttpUrl(const std::string& url) {
+    return
+        url.find("http://") == 0 ||
+        url.find("https://") == 0;
+}
+
+bool isHtmlContentType(const char* contentType) {
+    if (contentType == nullptr) {
+        return false;
+    }
+
+    std::string normalized = contentType;
+    std::transform(
+        normalized.begin(),
+        normalized.end(),
+        normalized.begin(),
+        [](unsigned char character) {
+            return static_cast<char>(std::tolower(character));
+        }
+    );
+
+    return
+        normalized.find("text/html") == 0 ||
+        normalized.find("application/xhtml+xml") == 0;
+}
+
+} // namespace
+
+Crawler::Crawler(
+    const std::string& startUrl,
+    CrawlerOptions options
+)
+    : startUrl(startUrl), options(options) {}
 
 std::vector<Document> Crawler::crawl(std::size_t maxPages) {
     std::queue<std::string> urls;
     std::vector<Document> documents;
     const HtmlTextExtractor textExtractor;
+    bool hasMadeHttpRequest = false;
 
     // Put starting URL in queue.
     urls.push(startUrl);
@@ -29,6 +67,17 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
     while (!urls.empty() && visited.size() < maxPages) {
         std::string url = urls.front();
         urls.pop();
+
+        if (isHttpUrl(url)) {
+            if (
+                hasMadeHttpRequest &&
+                options.requestDelay.count() > 0
+            ) {
+                std::this_thread::sleep_for(options.requestDelay);
+            }
+
+            hasMadeHttpRequest = true;
+        }
 
         std::cout << "\nCrawling: " << url << '\n';
 
@@ -115,7 +164,30 @@ std::string Crawler::downloadPage(const std::string& url) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &html);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "BerkeleySearchBot/0.1");
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+    curl_easy_setopt(
+        curl,
+        CURLOPT_USERAGENT,
+        "BerkeleySearchLearningBot/0.1"
+    );
+
+    if (options.requestTimeout.count() > 0) {
+        curl_easy_setopt(
+            curl,
+            CURLOPT_TIMEOUT_MS,
+            static_cast<long>(options.requestTimeout.count())
+        );
+    }
+
+    if (options.connectTimeout.count() > 0) {
+        curl_easy_setopt(
+            curl,
+            CURLOPT_CONNECTTIMEOUT_MS,
+            static_cast<long>(options.connectTimeout.count())
+        );
+    }
 
     CURLcode result = curl_easy_perform(curl);
 
@@ -127,6 +199,36 @@ std::string Crawler::downloadPage(const std::string& url) {
 
         curl_easy_cleanup(curl);
         return "";
+    }
+
+    if (isHttpUrl(url)) {
+        long statusCode = 0;
+        char* contentType = nullptr;
+
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
+        curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &contentType);
+
+        if (statusCode < 200 || statusCode >= 300) {
+            std::cerr
+                << "HTTP status "
+                << statusCode
+                << " for "
+                << url
+                << '\n';
+
+            curl_easy_cleanup(curl);
+            return "";
+        }
+
+        if (!isHtmlContentType(contentType)) {
+            std::cerr
+                << "Skipping non-HTML content at "
+                << url
+                << '\n';
+
+            curl_easy_cleanup(curl);
+            return "";
+        }
     }
 
     curl_easy_cleanup(curl);

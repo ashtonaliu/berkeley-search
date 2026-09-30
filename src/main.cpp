@@ -6,7 +6,10 @@ import berkeley_search.crawler;
 import berkeley_search.search_engine;
 
 int main() {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) {
+        std::cerr << "Could not initialize libcurl.\n";
+        return 1;
+    }
 
     Crawler crawler("https://eecs.berkeley.edu/");
     const auto documents = crawler.crawl(10);

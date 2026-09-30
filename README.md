@@ -16,6 +16,10 @@ ctest --test-dir build --output-on-failure
 
 The crawler executable is written to `build/berkeley-search`. Running it makes
 live HTTP requests, so keep the configured page limit small during development.
+The crawler waits one second between HTTP requests, applies connection and
+request timeouts, follows at most five redirects, rejects unsuccessful HTTP
+status codes, and indexes only HTML or XHTML responses. These defaults can be
+changed through `CrawlerOptions`.
 
 ## Search from the terminal
 

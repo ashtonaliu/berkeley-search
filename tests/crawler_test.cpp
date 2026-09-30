@@ -1,5 +1,6 @@
 #include <curl/curl.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -7,6 +8,8 @@
 #include <vector>
 
 import berkeley_search.crawler;
+
+using namespace std::chrono_literals;
 
 int main() {
     const std::filesystem::path pagePath =
@@ -36,7 +39,12 @@ int main() {
         return 1;
     }
 
-    Crawler crawler(pageUrl);
+    CrawlerOptions options;
+    options.requestDelay = 0ms;
+    options.requestTimeout = 2s;
+    options.connectTimeout = 2s;
+
+    Crawler crawler(pageUrl, options);
     const std::vector<Document> documents = crawler.crawl(1);
 
     curl_global_cleanup();

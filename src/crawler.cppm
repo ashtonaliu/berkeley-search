@@ -1,5 +1,6 @@
 module;
 
+#include <chrono>
 #include <cstddef>
 #include <string>
 #include <unordered_set>
@@ -9,14 +10,24 @@ export module berkeley_search.crawler;
 
 export import berkeley_search.document;
 
+export struct CrawlerOptions {
+    std::chrono::milliseconds requestDelay{1000};
+    std::chrono::milliseconds requestTimeout{15000};
+    std::chrono::milliseconds connectTimeout{5000};
+};
+
 export class Crawler {
 public:
-    explicit Crawler(const std::string& startUrl);
+    explicit Crawler(
+        const std::string& startUrl,
+        CrawlerOptions options = {}
+    );
 
     std::vector<Document> crawl(std::size_t maxPages);
 
 private:
     std::string startUrl;
+    CrawlerOptions options;
     std::unordered_set<std::string> discovered;
     std::unordered_set<std::string> visited;
 
