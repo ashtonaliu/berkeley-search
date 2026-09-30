@@ -76,6 +76,12 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_target(tokenizer-module
+    DEPENDS
+        "${TOKENIZER_INTERFACE_OBJECT}"
+        "${TOKENIZER_IMPLEMENTATION_OBJECT}"
+)
+
 add_custom_command(
     OUTPUT "${TOKENIZER_TEST_OBJECT}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
@@ -84,7 +90,7 @@ add_custom_command(
         "-fmodule-file=berkeley_search.tokenizer=${TOKENIZER_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/tokenizer_test.cpp"
         -o "${TOKENIZER_TEST_OBJECT}"
-    DEPENDS tests/tokenizer_test.cpp "${TOKENIZER_PCM}"
+    DEPENDS tests/tokenizer_test.cpp
     VERBATIM
 )
 
@@ -96,8 +102,6 @@ add_custom_command(
         "${TOKENIZER_TEST_OBJECT}"
         -o "${TOKENIZER_TEST_EXECUTABLE}"
     DEPENDS
-        "${TOKENIZER_INTERFACE_OBJECT}"
-        "${TOKENIZER_IMPLEMENTATION_OBJECT}"
         "${TOKENIZER_TEST_OBJECT}"
     VERBATIM
 )
@@ -105,6 +109,8 @@ add_custom_command(
 add_custom_target(tokenizer-tests ALL
     DEPENDS "${TOKENIZER_TEST_EXECUTABLE}"
 )
+
+add_dependencies(tokenizer-tests tokenizer-module)
 
 add_test(NAME tokenizer COMMAND "${TOKENIZER_TEST_EXECUTABLE}")
 
@@ -160,6 +166,12 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_target(html-text-extractor-module
+    DEPENDS
+        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
+        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+)
+
 add_custom_command(
     OUTPUT "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
@@ -168,7 +180,7 @@ add_custom_command(
         "-fmodule-file=berkeley_search.html_text_extractor=${HTML_TEXT_EXTRACTOR_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/html_text_extractor_test.cpp"
         -o "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
-    DEPENDS tests/html_text_extractor_test.cpp "${HTML_TEXT_EXTRACTOR_PCM}"
+    DEPENDS tests/html_text_extractor_test.cpp
     VERBATIM
 )
 
@@ -180,14 +192,17 @@ add_custom_command(
         "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
         -o "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
     DEPENDS
-        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
-        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_TEST_OBJECT}"
     VERBATIM
 )
 
 add_custom_target(html-text-extractor-tests ALL
     DEPENDS "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
+)
+
+add_dependencies(
+    html-text-extractor-tests
+    html-text-extractor-module
 )
 
 add_test(
@@ -232,6 +247,10 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_target(document-module
+    DEPENDS "${DOCUMENT_INTERFACE_OBJECT}"
+)
+
 add_custom_command(
     OUTPUT "${DOCUMENT_TEST_OBJECT}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
@@ -240,7 +259,7 @@ add_custom_command(
         "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/document_test.cpp"
         -o "${DOCUMENT_TEST_OBJECT}"
-    DEPENDS tests/document_test.cpp "${DOCUMENT_PCM}"
+    DEPENDS tests/document_test.cpp
     VERBATIM
 )
 
@@ -251,7 +270,6 @@ add_custom_command(
         "${DOCUMENT_TEST_OBJECT}"
         -o "${DOCUMENT_TEST_EXECUTABLE}"
     DEPENDS
-        "${DOCUMENT_INTERFACE_OBJECT}"
         "${DOCUMENT_TEST_OBJECT}"
     VERBATIM
 )
@@ -259,6 +277,8 @@ add_custom_command(
 add_custom_target(document-tests ALL
     DEPENDS "${DOCUMENT_TEST_EXECUTABLE}"
 )
+
+add_dependencies(document-tests document-module)
 
 add_test(NAME document COMMAND "${DOCUMENT_TEST_EXECUTABLE}")
 
@@ -283,7 +303,7 @@ add_custom_command(
         "${CMAKE_CURRENT_SOURCE_DIR}/src/crawler.cppm"
         --precompile
         -o "${CRAWLER_PCM}"
-    DEPENDS src/crawler.cppm "${DOCUMENT_PCM}"
+    DEPENDS src/crawler.cppm
     VERBATIM
 )
 
@@ -296,7 +316,7 @@ add_custom_command(
         "${CRAWLER_PCM}"
         -c
         -o "${CRAWLER_INTERFACE_OBJECT}"
-    DEPENDS "${CRAWLER_PCM}" "${DOCUMENT_PCM}"
+    DEPENDS "${CRAWLER_PCM}"
     VERBATIM
 )
 
@@ -314,9 +334,19 @@ add_custom_command(
     DEPENDS
         src/crawler.cpp
         "${CRAWLER_PCM}"
-        "${DOCUMENT_PCM}"
-        "${HTML_TEXT_EXTRACTOR_PCM}"
     VERBATIM
+)
+
+add_custom_target(crawler-module
+    DEPENDS
+        "${CRAWLER_INTERFACE_OBJECT}"
+        "${CRAWLER_IMPLEMENTATION_OBJECT}"
+)
+
+add_dependencies(
+    crawler-module
+    document-module
+    html-text-extractor-module
 )
 
 add_custom_command(
@@ -329,7 +359,7 @@ add_custom_command(
         "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
         -o "${MAIN_OBJECT}"
-    DEPENDS src/main.cpp "${CRAWLER_PCM}" "${DOCUMENT_PCM}"
+    DEPENDS src/main.cpp
     VERBATIM
 )
 
@@ -345,11 +375,6 @@ add_custom_command(
         "${CURL_LIBRARY}"
         -o "${SEARCH_EXECUTABLE}"
     DEPENDS
-        "${CRAWLER_INTERFACE_OBJECT}"
-        "${CRAWLER_IMPLEMENTATION_OBJECT}"
-        "${DOCUMENT_INTERFACE_OBJECT}"
-        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
-        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${MAIN_OBJECT}"
     VERBATIM
 )
@@ -357,6 +382,8 @@ add_custom_command(
 add_custom_target(search-app ALL
     DEPENDS "${SEARCH_EXECUTABLE}"
 )
+
+add_dependencies(search-app crawler-module)
 
 set(CRAWLER_TEST_OBJECT
     "${OBJECT_DIRECTORY}/crawler-test.o"
@@ -377,8 +404,6 @@ add_custom_command(
         -o "${CRAWLER_TEST_OBJECT}"
     DEPENDS
         tests/crawler_test.cpp
-        "${CRAWLER_PCM}"
-        "${DOCUMENT_PCM}"
     VERBATIM
 )
 
@@ -394,11 +419,6 @@ add_custom_command(
         "${CURL_LIBRARY}"
         -o "${CRAWLER_TEST_EXECUTABLE}"
     DEPENDS
-        "${CRAWLER_INTERFACE_OBJECT}"
-        "${CRAWLER_IMPLEMENTATION_OBJECT}"
-        "${DOCUMENT_INTERFACE_OBJECT}"
-        "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
-        "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
         "${CRAWLER_TEST_OBJECT}"
     VERBATIM
 )
@@ -406,5 +426,7 @@ add_custom_command(
 add_custom_target(crawler-tests ALL
     DEPENDS "${CRAWLER_TEST_EXECUTABLE}"
 )
+
+add_dependencies(crawler-tests crawler-module)
 
 add_test(NAME crawler COMMAND "${CRAWLER_TEST_EXECUTABLE}")
