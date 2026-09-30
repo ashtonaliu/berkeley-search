@@ -21,6 +21,14 @@ request timeouts, follows at most five redirects, rejects unsuccessful HTTP
 status codes, and indexes only HTML or XHTML responses. These defaults can be
 changed through `CrawlerOptions`.
 
+Before downloading pages, the crawler fetches `/robots.txt` for the starting
+origin and applies the rules for `BerkeleySearchLearningBot`. It supports
+case-insensitive user-agent selection, combined matching groups, `Allow`,
+`Disallow`, `*`, `$`, longest-match precedence, and allow-on-tie. A missing
+policy reported with an HTTP 4xx response permits crawling; transport errors,
+server errors, and invalid robots content stop the crawl. Full URI
+percent-encoding normalization remains a future improvement.
+
 ## Search from the terminal
 
 Run the crawler and interactive search prompt with:

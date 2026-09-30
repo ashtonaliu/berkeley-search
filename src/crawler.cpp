@@ -15,6 +15,7 @@ module;
 module berkeley_search.crawler;
 
 import berkeley_search.html_text_extractor;
+import berkeley_search.robots_policy;
 
 namespace {
 
@@ -24,9 +25,9 @@ bool isHttpUrl(const std::string& url) {
         url.find("https://") == 0;
 }
 
-bool isHtmlContentType(const char* contentType) {
+std::string normalizedContentType(const char* contentType) {
     if (contentType == nullptr) {
-        return false;
+        return "";
     }
 
     std::string normalized = contentType;
@@ -39,9 +40,60 @@ bool isHtmlContentType(const char* contentType) {
         }
     );
 
+    return normalized;
+}
+
+bool isHtmlContentType(const char* contentType) {
+    const std::string normalized = normalizedContentType(contentType);
+
     return
         normalized.find("text/html") == 0 ||
         normalized.find("application/xhtml+xml") == 0;
+}
+
+bool isRobotsContentType(const char* contentType) {
+    return normalizedContentType(contentType).find("text/plain") == 0;
+}
+
+std::string originFromUrl(const std::string& url) {
+    const std::size_t schemeEnd = url.find("://");
+
+    if (schemeEnd == std::string::npos) {
+        return "";
+    }
+
+    const std::size_t authorityEnd =
+        url.find_first_of("/?#", schemeEnd + 3);
+
+    if (authorityEnd == std::string::npos) {
+        return url;
+    }
+
+    return url.substr(0, authorityEnd);
+}
+
+std::string pathFromUrl(const std::string& url) {
+    const std::size_t schemeEnd = url.find("://");
+
+    if (schemeEnd == std::string::npos) {
+        return "/";
+    }
+
+    const std::size_t pathStart =
+        url.find_first_of("/?#", schemeEnd + 3);
+
+    if (pathStart == std::string::npos || url[pathStart] == '#') {
+        return "/";
+    }
+
+    const std::size_t fragment = url.find('#', pathStart);
+    std::string path = url.substr(pathStart, fragment - pathStart);
+
+    if (!path.empty() && path.front() == '?') {
+        path.insert(path.begin(), '/');
+    }
+
+    return path.empty() ? "/" : path;
 }
 
 } // namespace
@@ -56,7 +108,48 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
     std::queue<std::string> urls;
     std::vector<Document> documents;
     const HtmlTextExtractor textExtractor;
+    RobotsPolicy robotsPolicy;
     bool hasMadeHttpRequest = false;
+
+    if (isHttpUrl(startUrl)) {
+        const std::string robotsUrl =
+            originFromUrl(startUrl) + "/robots.txt";
+
+        std::cout << "Checking robots policy: " << robotsUrl << '\n';
+
+        const DownloadResult robots =
+            download(robotsUrl, ResourceType::Robots);
+        hasMadeHttpRequest = true;
+
+        if (!robots.transportSucceeded) {
+            std::cerr
+                << "Could not retrieve robots.txt; stopping crawl.\n";
+            return documents;
+        }
+
+        if (robots.statusCode >= 200 && robots.statusCode < 300) {
+            if (!robots.contentTypeAccepted) {
+                std::cerr
+                    << "robots.txt was not served as text/plain; "
+                    << "stopping crawl.\n";
+                return documents;
+            }
+
+            robotsPolicy.parse(robots.body, options.productToken);
+        } else if (
+            robots.statusCode < 400 ||
+            robots.statusCode >= 500
+        ) {
+            std::cerr
+                << "robots.txt returned HTTP status "
+                << robots.statusCode
+                << "; stopping crawl.\n";
+            return documents;
+        } else {
+            std::cout
+                << "No robots policy published; continuing crawl.\n";
+        }
+    }
 
     // Put starting URL in queue.
     urls.push(startUrl);
@@ -69,6 +162,11 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
         urls.pop();
 
         if (isHttpUrl(url)) {
+            if (!robotsPolicy.allows(pathFromUrl(url))) {
+                std::cout << "Blocked by robots.txt: " << url << '\n';
+                continue;
+            }
+
             if (
                 hasMadeHttpRequest &&
                 options.requestDelay.count() > 0
@@ -81,12 +179,30 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
 
         std::cout << "\nCrawling: " << url << '\n';
 
-        std::string html = downloadPage(url);
+        const DownloadResult page = download(url, ResourceType::Html);
 
-        if (html.empty()) {
+        if (!page.transportSucceeded || page.body.empty()) {
             std::cout << "Failed to download page\n";
             continue;
         }
+
+        if (
+            isHttpUrl(url) &&
+            (page.statusCode < 200 || page.statusCode >= 300)
+        ) {
+            std::cout
+                << "Skipping HTTP status "
+                << page.statusCode
+                << '\n';
+            continue;
+        }
+
+        if (!page.contentTypeAccepted) {
+            std::cout << "Skipping non-HTML content\n";
+            continue;
+        }
+
+        const std::string& html = page.body;
 
         // This page has now actually been crawled.
         visited.insert(url);
@@ -108,6 +224,13 @@ std::vector<Document> Crawler::crawl(std::size_t maxPages) {
             }
 
             if (!shouldVisit(normalized)) {
+                continue;
+            }
+
+            if (
+                isHttpUrl(normalized) &&
+                !robotsPolicy.allows(pathFromUrl(normalized))
+            ) {
                 continue;
             }
 
@@ -151,18 +274,20 @@ std::size_t Crawler::writeCallback(
     return totalBytes;
 }
 
-std::string Crawler::downloadPage(const std::string& url) {
+Crawler::DownloadResult Crawler::download(
+    const std::string& url,
+    ResourceType resourceType
+) {
+    DownloadResult downloadResult;
     CURL* curl = curl_easy_init();
 
     if (!curl) {
-        return "";
+        return downloadResult;
     }
-
-    std::string html;
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &html);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &downloadResult.body);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
@@ -170,7 +295,7 @@ std::string Crawler::downloadPage(const std::string& url) {
     curl_easy_setopt(
         curl,
         CURLOPT_USERAGENT,
-        "BerkeleySearchLearningBot/0.1"
+        options.userAgent.c_str()
     );
 
     if (options.requestTimeout.count() > 0) {
@@ -189,50 +314,40 @@ std::string Crawler::downloadPage(const std::string& url) {
         );
     }
 
-    CURLcode result = curl_easy_perform(curl);
+    const CURLcode transferResult = curl_easy_perform(curl);
 
-    if (result != CURLE_OK) {
+    if (transferResult != CURLE_OK) {
         std::cerr
             << "curl error: "
-            << curl_easy_strerror(result)
+            << curl_easy_strerror(transferResult)
             << '\n';
 
         curl_easy_cleanup(curl);
-        return "";
+        return downloadResult;
     }
 
+    downloadResult.transportSucceeded = true;
+
     if (isHttpUrl(url)) {
-        long statusCode = 0;
         char* contentType = nullptr;
 
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
+        curl_easy_getinfo(
+            curl,
+            CURLINFO_RESPONSE_CODE,
+            &downloadResult.statusCode
+        );
         curl_easy_getinfo(curl, CURLINFO_CONTENT_TYPE, &contentType);
 
-        if (statusCode < 200 || statusCode >= 300) {
-            std::cerr
-                << "HTTP status "
-                << statusCode
-                << " for "
-                << url
-                << '\n';
-
-            curl_easy_cleanup(curl);
-            return "";
-        }
-
-        if (!isHtmlContentType(contentType)) {
-            std::cerr
-                << "Skipping non-HTML content at "
-                << url
-                << '\n';
-
-            curl_easy_cleanup(curl);
-            return "";
-        }
+        downloadResult.contentTypeAccepted =
+            resourceType == ResourceType::Html
+                ? isHtmlContentType(contentType)
+                : isRobotsContentType(contentType);
+    } else {
+        downloadResult.contentTypeAccepted = true;
     }
 
     curl_easy_cleanup(curl);
-    return html;
+    return downloadResult;
 }
 
 std::vector<std::string> Crawler::extractLinks(

@@ -14,6 +14,8 @@ export struct CrawlerOptions {
     std::chrono::milliseconds requestDelay{1000};
     std::chrono::milliseconds requestTimeout{15000};
     std::chrono::milliseconds connectTimeout{5000};
+    std::string productToken{"BerkeleySearchLearningBot"};
+    std::string userAgent{"BerkeleySearchLearningBot/0.1"};
 };
 
 export class Crawler {
@@ -26,6 +28,18 @@ public:
     std::vector<Document> crawl(std::size_t maxPages);
 
 private:
+    enum class ResourceType {
+        Html,
+        Robots
+    };
+
+    struct DownloadResult {
+        std::string body;
+        long statusCode = 0;
+        bool transportSucceeded = false;
+        bool contentTypeAccepted = false;
+    };
+
     std::string startUrl;
     CrawlerOptions options;
     std::unordered_set<std::string> discovered;
@@ -38,7 +52,10 @@ private:
         void* userData
     );
 
-    std::string downloadPage(const std::string& url);
+    DownloadResult download(
+        const std::string& url,
+        ResourceType resourceType
+    );
 
     std::vector<std::string> extractLinks(
         const std::string& html

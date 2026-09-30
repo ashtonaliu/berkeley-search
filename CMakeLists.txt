@@ -210,6 +210,95 @@ add_test(
     COMMAND "${HTML_TEXT_EXTRACTOR_TEST_EXECUTABLE}"
 )
 
+set(ROBOTS_POLICY_PCM
+    "${MODULE_DIRECTORY}/berkeley_search.robots_policy.pcm"
+)
+set(ROBOTS_POLICY_INTERFACE_OBJECT
+    "${OBJECT_DIRECTORY}/robots-policy-interface.o"
+)
+set(ROBOTS_POLICY_IMPLEMENTATION_OBJECT
+    "${OBJECT_DIRECTORY}/robots-policy.o"
+)
+set(ROBOTS_POLICY_TEST_OBJECT
+    "${OBJECT_DIRECTORY}/robots-policy-test.o"
+)
+set(ROBOTS_POLICY_TEST_EXECUTABLE
+    "${CMAKE_CURRENT_BINARY_DIR}/robots-policy-test"
+)
+
+add_custom_command(
+    OUTPUT "${ROBOTS_POLICY_PCM}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MODULE_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/robots_policy.cppm"
+        --precompile
+        -o "${ROBOTS_POLICY_PCM}"
+    DEPENDS src/robots_policy.cppm
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${ROBOTS_POLICY_INTERFACE_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "${ROBOTS_POLICY_PCM}"
+        -c
+        -o "${ROBOTS_POLICY_INTERFACE_OBJECT}"
+    DEPENDS "${ROBOTS_POLICY_PCM}"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.robots_policy=${ROBOTS_POLICY_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/src/robots_policy.cpp"
+        -o "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
+    DEPENDS src/robots_policy.cpp "${ROBOTS_POLICY_PCM}"
+    VERBATIM
+)
+
+add_custom_target(robots-policy-module
+    DEPENDS
+        "${ROBOTS_POLICY_INTERFACE_OBJECT}"
+        "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
+)
+
+add_custom_command(
+    OUTPUT "${ROBOTS_POLICY_TEST_OBJECT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OBJECT_DIRECTORY}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        ${COMMON_COMPILE_FLAGS}
+        "-fmodule-file=berkeley_search.robots_policy=${ROBOTS_POLICY_PCM}"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/tests/robots_policy_test.cpp"
+        -o "${ROBOTS_POLICY_TEST_OBJECT}"
+    DEPENDS tests/robots_policy_test.cpp
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${ROBOTS_POLICY_TEST_EXECUTABLE}"
+    COMMAND "${CMAKE_CXX_COMPILER}"
+        "${ROBOTS_POLICY_INTERFACE_OBJECT}"
+        "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
+        "${ROBOTS_POLICY_TEST_OBJECT}"
+        -o "${ROBOTS_POLICY_TEST_EXECUTABLE}"
+    DEPENDS "${ROBOTS_POLICY_TEST_OBJECT}"
+    VERBATIM
+)
+
+add_custom_target(robots-policy-tests ALL
+    DEPENDS "${ROBOTS_POLICY_TEST_EXECUTABLE}"
+)
+
+add_dependencies(robots-policy-tests robots-policy-module)
+
+add_test(NAME robots-policy COMMAND "${ROBOTS_POLICY_TEST_EXECUTABLE}")
+
 set(DOCUMENT_PCM
     "${MODULE_DIRECTORY}/berkeley_search.document.pcm"
 )
@@ -540,6 +629,7 @@ add_custom_command(
         "-I${CURL_INCLUDE_DIRECTORY}"
         "-fmodule-file=berkeley_search.document=${DOCUMENT_PCM}"
         "-fmodule-file=berkeley_search.html_text_extractor=${HTML_TEXT_EXTRACTOR_PCM}"
+        "-fmodule-file=berkeley_search.robots_policy=${ROBOTS_POLICY_PCM}"
         "-fmodule-file=berkeley_search.crawler=${CRAWLER_PCM}"
         -c "${CMAKE_CURRENT_SOURCE_DIR}/src/crawler.cpp"
         -o "${CRAWLER_IMPLEMENTATION_OBJECT}"
@@ -559,6 +649,7 @@ add_dependencies(
     crawler-module
     document-module
     html-text-extractor-module
+    robots-policy-module
 )
 
 add_custom_command(
@@ -585,6 +676,8 @@ add_custom_command(
         "${DOCUMENT_INTERFACE_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${ROBOTS_POLICY_INTERFACE_OBJECT}"
+        "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
         "${SEARCH_INDEX_INTERFACE_OBJECT}"
         "${SEARCH_INDEX_IMPLEMENTATION_OBJECT}"
         "${SEARCH_ENGINE_INTERFACE_OBJECT}"
@@ -639,6 +732,8 @@ add_custom_command(
         "${DOCUMENT_INTERFACE_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_INTERFACE_OBJECT}"
         "${HTML_TEXT_EXTRACTOR_IMPLEMENTATION_OBJECT}"
+        "${ROBOTS_POLICY_INTERFACE_OBJECT}"
+        "${ROBOTS_POLICY_IMPLEMENTATION_OBJECT}"
         "${CRAWLER_TEST_OBJECT}"
         "${CURL_LIBRARY}"
         -o "${CRAWLER_TEST_EXECUTABLE}"
